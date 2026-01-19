@@ -10,11 +10,13 @@ $AGENT_VERSION = "{{AGENT_VERSION}}"
 # ----------------------------------
 
 $ARCH = if ($env:PROCESSOR_ARCHITECTURE -eq "AMD64") { "amd64" } else { "386" }
-$BINARY_NAME = "snapsec-agent.exe"
+$BINARY_NAME = "agent"
 $INSTALL_DIR = "C:\Program Files\SnapsecAgent"
 $CONFIG_DIR = "C:\ProgramData\snapsec-agent"
 $CONFIG_PATH = "$CONFIG_DIR\config.yaml"
-$DOWNLOAD_URL = "${BACKEND_URL}/download/agent/windows/${ARCH}/${BINARY_NAME}"
+$GITHUB_REPO = "faizanalibhat/aim-agent"
+$BINARY_FILENAME = "${BINARY_NAME}_${AGENT_VERSION}_windows_${ARCH}"
+$DOWNLOAD_URL = "https://github.com/${GITHUB_REPO}/releases/download/${AGENT_VERSION}/${BINARY_FILENAME}"
 
 Write-Host "Installing Snapsec Agent for Windows ($ARCH)..." -ForegroundColor Cyan
 

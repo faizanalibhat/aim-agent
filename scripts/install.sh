@@ -21,9 +21,11 @@ elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
     ARCH="arm64"
 fi
 
-BINARY_NAME="snapsec-agent"
+BINARY_NAME="agent"
 CONFIG_PATH="/etc/snapsec-agent.yaml"
-DOWNLOAD_URL="${BACKEND_URL}/download/agent/${OS}/${ARCH}/${BINARY_NAME}"
+GITHUB_REPO="faizanalibhat/aim-agent"
+BINARY_FILENAME="${BINARY_NAME}_${AGENT_VERSION}_${OS}_${ARCH}"
+DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/${AGENT_VERSION}/${BINARY_FILENAME}"
 
 echo "Installing Snapsec Agent for ${OS} (${ARCH})..."
 
