@@ -6,10 +6,15 @@ import (
 	"os"
 	"snapsec-agent/internal/config"
 	"snapsec-agent/internal/modules"
+	"snapsec-agent/internal/modules/devices"
+	"snapsec-agent/internal/modules/hardware"
 	"snapsec-agent/internal/modules/host"
 	"snapsec-agent/internal/modules/network"
 	"snapsec-agent/internal/modules/packages"
 	"snapsec-agent/internal/modules/processes"
+	"snapsec-agent/internal/modules/security"
+	"snapsec-agent/internal/modules/services"
+	"snapsec-agent/internal/modules/users"
 	"snapsec-agent/pkg/api"
 	"time"
 )
@@ -29,9 +34,14 @@ func NewAgent(cfg *config.Config, configPath string) *Agent {
 		api:        api.NewClient(cfg.BackendURL, cfg.APIKey),
 		modules: []modules.Module{
 			&host.HostModule{},
+			&hardware.HardwareModule{},
 			&network.NetworkModule{},
-			&packages.PackagesModule{},
 			&processes.ProcessesModule{},
+			&packages.PackagesModule{},
+			&services.ServicesModule{},
+			&devices.DevicesModule{},
+			&users.UsersModule{},
+			&security.SecurityModule{},
 		},
 		stop: make(chan struct{}),
 	}
@@ -102,15 +112,32 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) gatherAll() (map[string]interface{}, error) {
-	results := make(map[string]interface{})
+	payload := make(map[string]interface{})
+
+	// Agent info
+	payload["agent"] = map[string]string{
+		"id":      a.cfg.AgentID,
+		"version": config.Version,
+	}
+
 	for _, m := range a.modules {
 		data, err := m.Gather()
 		if err != nil {
 			log.Printf("Module %s failed: %v", m.Name(), err)
 			continue
 		}
-		results[m.Name()] = data
+
+		// Special handling for modules that return multiple top-level keys
+		if m.Name() == "host_os" {
+			if mData, ok := data.(map[string]interface{}); ok {
+				for k, v := range mData {
+					payload[k] = v
+				}
+			}
+		} else {
+			payload[m.Name()] = data
+		}
 	}
 
-	return results, nil
+	return payload, nil
 }

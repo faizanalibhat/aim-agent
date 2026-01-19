@@ -9,8 +9,16 @@ import (
 type PackagesModule struct{}
 
 type PackageInfo struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Arch        string `json:"arch"`
+	InstalledAt string `json:"installed_at"`
+}
+
+type PackagesData struct {
+	Type  string        `json:"type"`
+	Count int           `json:"count"`
+	List  []PackageInfo `json:"list"`
 }
 
 func (m *PackagesModule) Name() string {
@@ -18,46 +26,34 @@ func (m *PackagesModule) Name() string {
 }
 
 func (m *PackagesModule) Gather() (interface{}, error) {
+	var pkgType string
+	var list []PackageInfo
+
 	switch runtime.GOOS {
 	case "linux":
-		return m.gatherLinux()
+		if _, err := exec.LookPath("dpkg"); err == nil {
+			pkgType = "apt"
+			out, _ := exec.Command("dpkg-query", "-W", "-f=${Package} ${Version} ${Architecture}\n").Output()
+			list = parseLines(string(out))
+		} else if _, err := exec.LookPath("rpm"); err == nil {
+			pkgType = "rpm"
+			out, _ := exec.Command("rpm", "-qa", "--queryformat", "%{NAME} %{VERSION} %{ARCH}\n").Output()
+			list = parseLines(string(out))
+		}
 	case "darwin":
-		return m.gatherDarwin()
-	case "windows":
-		return m.gatherWindows()
-	default:
-		return nil, nil
-	}
-}
-
-func (m *PackagesModule) gatherLinux() ([]PackageInfo, error) {
-	// Try dpkg (Debian/Ubuntu)
-	if _, err := exec.LookPath("dpkg"); err == nil {
-		out, _ := exec.Command("dpkg-query", "-W", "-f=${Package} ${Version}\n").Output()
-		return parseLines(string(out)), nil
-	}
-	// Try rpm (CentOS/RHEL)
-	if _, err := exec.LookPath("rpm"); err == nil {
-		out, _ := exec.Command("rpm", "-qa", "--queryformat", "%{NAME} %{VERSION}\n").Output()
-		return parseLines(string(out)), nil
-	}
-	return nil, nil
-}
-
-func (m *PackagesModule) gatherDarwin() ([]PackageInfo, error) {
-	// Try brew
-	if _, err := exec.LookPath("brew"); err == nil {
+		pkgType = "brew"
 		out, _ := exec.Command("brew", "list", "--versions").Output()
-		return parseLines(string(out)), nil
+		list = parseLines(string(out))
+	case "windows":
+		pkgType = "windows"
+		// Simplified
 	}
-	return nil, nil
-}
 
-func (m *PackagesModule) gatherWindows() ([]PackageInfo, error) {
-	// Use powershell to get installed software
-	cmd := "Get-ItemProperty HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Select-Object DisplayName, DisplayVersion | ForEach-Object { \"$($_.DisplayName) $($_.DisplayVersion)\" }"
-	out, _ := exec.Command("powershell", "-Command", cmd).Output()
-	return parseLines(string(out)), nil
+	return PackagesData{
+		Type:  pkgType,
+		Count: len(list),
+		List:  list,
+	}, nil
 }
 
 func parseLines(output string) []PackageInfo {
@@ -69,15 +65,16 @@ func parseLines(output string) []PackageInfo {
 			continue
 		}
 		parts := strings.Fields(line)
-		if len(parts) >= 2 {
+		if len(parts) >= 3 {
 			pkgs = append(pkgs, PackageInfo{
 				Name:    parts[0],
 				Version: parts[1],
+				Arch:    parts[2],
 			})
-		} else if len(parts) == 1 {
+		} else if len(parts) >= 2 {
 			pkgs = append(pkgs, PackageInfo{
 				Name:    parts[0],
-				Version: "unknown",
+				Version: parts[1],
 			})
 		}
 	}

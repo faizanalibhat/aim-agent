@@ -1,18 +1,26 @@
 package processes
 
 import (
+	"time"
+
 	"github.com/shirou/gopsutil/v3/process"
 )
 
 type ProcessesModule struct{}
 
 type ProcessInfo struct {
-	Pid      int32   `json:"pid"`
-	Name     string  `json:"name"`
-	Username string  `json:"username"`
-	CPU      float64 `json:"cpu"`
-	Memory   float32 `json:"memory"`
-	Status   string  `json:"status"`
+	Pid        int32   `json:"pid"`
+	PPid       int32   `json:"ppid"`
+	Name       string  `json:"name"`
+	User       string  `json:"user"`
+	CPUPercent float64 `json:"cpu_percent"`
+	MemoryMB   uint64  `json:"memory_mb"`
+	StartedAt  string  `json:"started_at"`
+}
+
+type ProcessesData struct {
+	Count int           `json:"count"`
+	List  []ProcessInfo `json:"list"`
 }
 
 func (m *ProcessesModule) Name() string {
@@ -25,27 +33,38 @@ func (m *ProcessesModule) Gather() (interface{}, error) {
 		return nil, err
 	}
 
-	var results []ProcessInfo
+	var list []ProcessInfo
 	for _, p := range procs {
+		ppid, _ := p.Ppid()
 		name, _ := p.Name()
-		username, _ := p.Username()
+		user, _ := p.Username()
 		cpu, _ := p.CPUPercent()
-		mem, _ := p.MemoryPercent()
-		status, _ := p.Status()
-		statusStr := "unknown"
-		if len(status) > 0 {
-			statusStr = status[0]
+		mem, _ := p.MemoryInfo()
+		createTime, _ := p.CreateTime()
+
+		startedAt := ""
+		if createTime > 0 {
+			startedAt = time.Unix(createTime/1000, 0).Format(time.RFC3339)
 		}
 
-		results = append(results, ProcessInfo{
-			Pid:      p.Pid,
-			Name:     name,
-			Username: username,
-			CPU:      cpu,
-			Memory:   mem,
-			Status:   statusStr,
+		var memMB uint64
+		if mem != nil {
+			memMB = mem.RSS / 1024 / 1024
+		}
+
+		list = append(list, ProcessInfo{
+			Pid:        p.Pid,
+			PPid:       ppid,
+			Name:       name,
+			User:       user,
+			CPUPercent: cpu,
+			MemoryMB:   memMB,
+			StartedAt:  startedAt,
 		})
 	}
 
-	return results, nil
+	return ProcessesData{
+		Count: len(list),
+		List:  list,
+	}, nil
 }
