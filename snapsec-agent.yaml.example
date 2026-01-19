@@ -1,0 +1,10 @@
+# Snapsec Agent Configuration
+
+# URL of the Snapsec backend
+backend_url: "http://localhost:8080"
+
+# API Key for authentication
+api_key: "your-api-key-here"
+
+# Interval in seconds for heartbeat and asset reporting
+interval: 5
