@@ -23,6 +23,7 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
 
+# ❌ Disable archives completely
 archives:
   - format: binary
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -31,6 +32,5 @@ checksum:
   name_template: checksums.txt
 
 release:
-  github:
-    owner: faizanalibhat
-    name: aim-agent
+  draft: false
+  prerelease: false
