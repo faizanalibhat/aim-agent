@@ -1,80 +1,93 @@
 package agent
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"snapsec-agent/internal/config"
 	"snapsec-agent/internal/modules"
 	"snapsec-agent/internal/modules/host"
 	"snapsec-agent/internal/modules/network"
+	"snapsec-agent/internal/modules/packages"
+	"snapsec-agent/internal/modules/processes"
 	"snapsec-agent/pkg/api"
 	"time"
 )
 
 type Agent struct {
-	cfg     *config.Config
-	api     *api.Client
-	modules []modules.Module
-	stop    chan struct{}
+	cfg        *config.Config
+	configPath string
+	api        *api.Client
+	modules    []modules.Module
+	stop       chan struct{}
 }
 
-func NewAgent(cfg *config.Config) *Agent {
+func NewAgent(cfg *config.Config, configPath string) *Agent {
 	return &Agent{
-		cfg: cfg,
-		api: api.NewClient(cfg.BackendURL, cfg.APIKey),
+		cfg:        cfg,
+		configPath: configPath,
+		api:        api.NewClient(cfg.BackendURL, cfg.APIKey),
 		modules: []modules.Module{
 			&host.HostModule{},
 			&network.NetworkModule{},
+			&packages.PackagesModule{},
+			&processes.ProcessesModule{},
 		},
 		stop: make(chan struct{}),
 	}
 }
 
 func (a *Agent) RegisterOnly() error {
-	assetData, err := a.gatherAll()
+	hostname, _ := os.Hostname()
+	log.Printf("Registering agent with hostname: %s", hostname)
+
+	agentID, err := a.api.Register(hostname)
 	if err != nil {
 		return err
 	}
-	return a.api.Register(assetData)
+
+	log.Printf("Registration successful. Assigned Agent ID: %s", agentID)
+	a.cfg.AgentID = agentID
+
+	// Save the agent ID back to the config file
+	if err := config.SaveConfig(a.configPath, a.cfg); err != nil {
+		return fmt.Errorf("failed to save config with agent ID: %w", err)
+	}
+
+	return nil
 }
 
 func (a *Agent) Start() error {
 	log.Println("Starting Snapsec Agent...")
 
-	// 1. Initial Data Gathering for Registration (Idempotent)
-	assetData, err := a.gatherAll()
-	if err != nil {
-		return err
+	// 1. Ensure we have an Agent ID
+	if a.cfg.AgentID == "" {
+		if err := a.RegisterOnly(); err != nil {
+			return fmt.Errorf("failed to register during start: %w", err)
+		}
 	}
 
-	// 2. Register Agent (Backend should handle re-registration)
-	if err := a.api.Register(assetData); err != nil {
-		log.Printf("Warning: Registration during start: %v", err)
-	}
-
-	// 3. Start Heartbeat and Asset Reporting Loops
+	// 2. Start Heartbeat and Results Reporting Loops
 	ticker := time.NewTicker(time.Duration(a.cfg.Interval) * time.Second)
 	defer ticker.Stop()
-
-	hostname, _ := os.Hostname()
 
 	for {
 		select {
 		case <-ticker.C:
 			// Send Heartbeat
-			if err := a.api.Heartbeat(hostname); err != nil {
+			if err := a.api.Heartbeat(a.cfg.AgentID); err != nil {
 				log.Printf("Heartbeat failed: %v", err)
 			}
 
-			// Gather and Send Assets
-			assets, err := a.gatherAll()
+			// Gather and Send Results
+			results, err := a.gatherAll()
 			if err != nil {
-				log.Printf("Failed to gather assets: %v", err)
+				log.Printf("Failed to gather results: %v", err)
 				continue
 			}
 
-			if err := a.api.SendAssets(assets); err != nil {
-				log.Printf("Failed to send assets: %v", err)
+			if err := a.api.SendResults(a.cfg.AgentID, results); err != nil {
+				log.Printf("Failed to send results: %v", err)
 			}
 
 		case <-a.stop:
@@ -98,5 +111,6 @@ func (a *Agent) gatherAll() (map[string]interface{}, error) {
 		}
 		results[m.Name()] = data
 	}
+
 	return results, nil
 }

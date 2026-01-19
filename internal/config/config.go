@@ -10,6 +10,7 @@ import (
 type Config struct {
 	BackendURL string `yaml:"backend_url"`
 	APIKey     string `yaml:"api_key"`
+	AgentID    string `yaml:"agent_id,omitempty"`
 	Interval   int    `yaml:"interval"` // in seconds
 }
 
@@ -36,4 +37,12 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func SaveConfig(path string, cfg *Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }

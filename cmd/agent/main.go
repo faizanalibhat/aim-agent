@@ -22,7 +22,7 @@ func main() {
 	}
 
 	// AutoHandle will install/register if not installed, or run if already installed.
-	if err := service.AutoHandle(cfg); err != nil {
+	if err := service.AutoHandle(cfg, *configPath); err != nil {
 		log.Fatal(err)
 	}
 }

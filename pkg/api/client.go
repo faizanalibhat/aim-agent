@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -24,8 +25,27 @@ func NewClient(baseURL, apiKey string) *Client {
 	}
 }
 
-func (c *Client) Register(agentInfo interface{}) error {
-	return c.post("/register", agentInfo)
+type RegisterResponse struct {
+	AgentID string `json:"agent_id"`
+}
+
+func (c *Client) Register(hostname string) (string, error) {
+	data := map[string]string{
+		"hostname": hostname,
+		"api_key":  c.APIKey,
+	}
+
+	respBody, err := c.postWithResponse("/register", data)
+	if err != nil {
+		return "", err
+	}
+
+	var regResp RegisterResponse
+	if err := json.Unmarshal(respBody, &regResp); err != nil {
+		return "", err
+	}
+
+	return regResp.AgentID, nil
 }
 
 func (c *Client) Heartbeat(agentID string) error {
@@ -36,20 +56,29 @@ func (c *Client) Heartbeat(agentID string) error {
 	return c.post("/heartbeat", data)
 }
 
-func (c *Client) SendAssets(assets interface{}) error {
-	return c.post("/assets", assets)
+func (c *Client) SendResults(agentID string, results interface{}) error {
+	data := map[string]interface{}{
+		"agent_id": agentID,
+		"data":     results,
+	}
+	return c.post("/results", data)
 }
 
 func (c *Client) post(endpoint string, data interface{}) error {
+	_, err := c.postWithResponse(endpoint, data)
+	return err
+}
+
+func (c *Client) postWithResponse(endpoint string, data interface{}) ([]byte, error) {
 	url := fmt.Sprintf("%s%s", c.BaseURL, endpoint)
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -57,13 +86,18 @@ func (c *Client) post(endpoint string, data interface{}) error {
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("backend returned status: %d", resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("backend returned status: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
 }

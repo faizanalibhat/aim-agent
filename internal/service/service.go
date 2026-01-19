@@ -30,20 +30,20 @@ func (p *program) Stop(s service.Service) error {
 	return nil
 }
 
-func newService(cfg *config.Config) (service.Service, error) {
+func newService(cfg *config.Config, configPath string) (service.Service, error) {
 	svcConfig := &service.Config{
 		Name:        "SnapsecAgent",
 		DisplayName: "Snapsec Security Agent",
 		Description: "Monitors system assets and sends data to Snapsec backend.",
 	}
 
-	a := agent.NewAgent(cfg)
+	a := agent.NewAgent(cfg, configPath)
 	prg := &program{agent: a}
 	return service.New(prg, svcConfig)
 }
 
-func AutoHandle(cfg *config.Config) error {
-	s, err := newService(cfg)
+func AutoHandle(cfg *config.Config, configPath string) error {
+	s, err := newService(cfg, configPath)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func AutoHandle(cfg *config.Config) error {
 			log.Println("Agent not installed. Starting installation process...")
 
 			// 1. Register with backend
-			a := agent.NewAgent(cfg)
+			a := agent.NewAgent(cfg, configPath)
 			log.Println("Registering agent with backend...")
 			if err := a.RegisterOnly(); err != nil {
 				return fmt.Errorf("registration failed (installation aborted): %w", err)
