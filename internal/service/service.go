@@ -32,8 +32,8 @@ func (p *program) Stop(s service.Service) error {
 
 func newService(cfg *config.Config, configPath string) (service.Service, error) {
 	svcConfig := &service.Config{
-		Name:        "SnapsecAgent",
-		DisplayName: "Snapsec Security Agent",
+		Name:        "snapsec-agent",
+		DisplayName: "Snapsec Agent",
 		Description: "Monitors system assets and sends data to Snapsec backend.",
 	}
 

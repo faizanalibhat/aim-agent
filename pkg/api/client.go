@@ -29,10 +29,13 @@ type RegisterResponse struct {
 	AgentID string `json:"agent_id"`
 }
 
-func (c *Client) Register(hostname string) (string, error) {
+func (c *Client) Register(hostname, os, version, ipAddress string) (string, error) {
 	data := map[string]string{
-		"hostname": hostname,
-		"api_key":  c.APIKey,
+		"hostname":   hostname,
+		"os":         os,
+		"version":    version,
+		"ipAddress": ipAddress,
+		"api_key":    c.APIKey,
 	}
 
 	respBody, err := c.postWithResponse("/register", data)

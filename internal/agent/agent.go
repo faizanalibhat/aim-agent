@@ -17,6 +17,7 @@ import (
 	"snapsec-agent/internal/modules/users"
 	"snapsec-agent/pkg/api"
 	"time"
+	"runtime"
 )
 
 type Agent struct {
@@ -49,9 +50,42 @@ func NewAgent(cfg *config.Config, configPath string) *Agent {
 
 func (a *Agent) RegisterOnly() error {
 	hostname, _ := os.Hostname()
-	log.Printf("Registering agent with hostname: %s", hostname)
 
-	agentID, err := a.api.Register(hostname)
+	// Gather basic info for registration
+	var osName, ipAddress string
+
+	// Use host module for OS info
+	hostMod := &host.HostModule{}
+	hostData, err := hostMod.Gather()
+	if err == nil {
+		if m, ok := hostData.(map[string]interface{}); ok {
+			if osInfo, ok := m["os"].(host.OSData); ok {
+				osName = osInfo.Name
+			}
+		}
+	}
+	if osName == "" {
+		osName = runtime.GOOS
+	}
+
+	// Use network module for IP info
+	netMod := &network.NetworkModule{}
+	netData, err := netMod.Gather()
+	if err == nil {
+		if n, ok := netData.(network.NetworkData); ok {
+			// Find first non-loopback IPv4
+			for _, i := range n.Interfaces {
+				if i.Name != "lo" && len(i.IPv4) > 0 {
+					ipAddress = i.IPv4[0]
+					break
+				}
+			}
+		}
+	}
+
+	log.Printf("Registering agent with hostname: %s, os: %s, ip: %s", hostname, osName, ipAddress)
+
+	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress)
 	if err != nil {
 		return err
 	}
