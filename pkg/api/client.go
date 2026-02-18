@@ -48,23 +48,57 @@ func (c *Client) Register(hostname, os, version, ipAddress string) (string, erro
 		return "", err
 	}
 
+	if regResp.AgentID == "" {
+		return "", fmt.Errorf("registration failed: agent_id not returned (body: %s)", string(respBody))
+	}
+
 	return regResp.AgentID, nil
 }
 
-func (c *Client) Heartbeat(agentID string) error {
+func (c *Client) Heartbeat(agentID string) (*ResultsResponse, error) {
 	data := map[string]string{
 		"agent_id":  agentID,
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
-	return c.post("/heartbeat", data)
+	
+	respBody, err := c.postWithResponse("/heartbeat", data)
+	if err != nil {
+		return nil, err
+	}
+
+	var res ResultsResponse
+	if err := json.Unmarshal(respBody, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
 }
 
-func (c *Client) SendResults(agentID string, results interface{}) error {
+type AgentConfiguration struct {
+	Kill bool `json:"kill"`
+}
+
+type ResultsResponse struct {
+	Configuration AgentConfiguration `json:"configuration"`
+}
+
+func (c *Client) SendResults(agentID string, results interface{}) (*ResultsResponse, error) {
 	data := map[string]interface{}{
 		"agent_id": agentID,
 		"data":     results,
 	}
-	return c.post("/results", data)
+
+	respBody, err := c.postWithResponse("/results", data)
+	if err != nil {
+		return nil, err
+	}
+
+	var res ResultsResponse
+	if err := json.Unmarshal(respBody, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
 }
 
 func (c *Client) post(endpoint string, data interface{}) error {
@@ -98,7 +132,7 @@ func (c *Client) postWithResponse(endpoint string, data interface{}) ([]byte, er
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNotFound {
 		return nil, fmt.Errorf("backend returned status: %d, body: %s", resp.StatusCode, string(body))
 	}
 

@@ -21,11 +21,12 @@ import (
 )
 
 type Agent struct {
-	cfg        *config.Config
-	configPath string
-	api        *api.Client
-	modules    []modules.Module
-	stop       chan struct{}
+	cfg         *config.Config
+	configPath  string
+	api         *api.Client
+	modules     []modules.Module
+	stop        chan struct{}
+	KillHandler func()
 }
 
 func NewAgent(cfg *config.Config, configPath string) *Agent {
@@ -119,8 +120,11 @@ func (a *Agent) Start() error {
 		select {
 		case <-ticker.C:
 			// Send Heartbeat
-			if err := a.api.Heartbeat(a.cfg.AgentID); err != nil {
+			respH, err := a.api.Heartbeat(a.cfg.AgentID)
+			if err != nil {
 				log.Printf("Heartbeat failed: %v", err)
+			} else if a.checkKill(respH) {
+				return nil
 			}
 
 			// Gather and Send Results
@@ -130,8 +134,11 @@ func (a *Agent) Start() error {
 				continue
 			}
 
-			if err := a.api.SendResults(a.cfg.AgentID, results); err != nil {
+			respR, err := a.api.SendResults(a.cfg.AgentID, results)
+			if err != nil {
 				log.Printf("Failed to send results: %v", err)
+			} else if a.checkKill(respR) {
+				return nil
 			}
 
 		case <-a.stop:
@@ -143,6 +150,19 @@ func (a *Agent) Start() error {
 
 func (a *Agent) Stop() {
 	close(a.stop)
+}
+
+func (a *Agent) checkKill(resp *api.ResultsResponse) bool {
+	if resp != nil && resp.Configuration.Kill {
+		log.Println("Kill signal received from backend. Initiating shutdown...")
+		if a.KillHandler != nil {
+			a.KillHandler()
+		} else {
+			os.Exit(0)
+		}
+		return true
+	}
+	return false
 }
 
 func (a *Agent) gatherAll() (map[string]interface{}, error) {

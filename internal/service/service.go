@@ -3,6 +3,7 @@ package service
 import (
 	"log"
 	"fmt"
+	"os"
 	"snapsec-agent/internal/agent"
 	"snapsec-agent/internal/config"
 
@@ -39,7 +40,21 @@ func newService(cfg *config.Config, configPath string) (service.Service, error) 
 
 	a := agent.NewAgent(cfg, configPath)
 	prg := &program{agent: a}
-	return service.New(prg, svcConfig)
+	s, err := service.New(prg, svcConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	a.KillHandler = func() {
+		log.Println("Kill signal received. Uninstalling service...")
+		if err := s.Uninstall(); err != nil {
+			log.Printf("Failed to uninstall service: %v", err)
+		}
+		log.Println("Service uninstalled. Exiting.")
+		os.Exit(0)
+	}
+
+	return s, nil
 }
 
 func AutoHandle(cfg *config.Config, configPath string) error {
