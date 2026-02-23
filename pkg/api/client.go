@@ -75,7 +75,9 @@ func (c *Client) Heartbeat(agentID string) (*ResultsResponse, error) {
 }
 
 type AgentConfiguration struct {
-	Kill bool `json:"kill"`
+	Kill              bool `json:"kill"`
+	HeartbeatInterval int  `json:"heartbeat_interval"` // in seconds
+	AssetPushInterval int  `json:"asset_push_interval"` // in seconds
 }
 
 type ResultsResponse struct {

@@ -10,10 +10,11 @@ import (
 const Version = "1.0.0"
 
 type Config struct {
-	BackendURL string `yaml:"backend_url"`
-	APIKey     string `yaml:"api_key"`
-	AgentID    string `yaml:"agent_id,omitempty"`
-	Interval   int    `yaml:"interval"` // in seconds
+	BackendURL        string `yaml:"backend_url"`
+	APIKey            string `yaml:"api_key"`
+	AgentID           string `yaml:"agent_id,omitempty"`
+	HeartbeatInterval int    `yaml:"heartbeat_interval"` // in seconds
+	AssetPushInterval int    `yaml:"asset_push_interval"` // in seconds
 }
 
 func GetDefaultConfigPath() string {
@@ -34,8 +35,12 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	if cfg.Interval == 0 {
-		cfg.Interval = 5 // Default to 5 seconds
+	if cfg.HeartbeatInterval == 0 {
+		cfg.HeartbeatInterval = 900 // Default to 15 minutes
+	}
+
+	if cfg.AssetPushInterval == 0 {
+		cfg.AssetPushInterval = 1800 // Default to 30 minutes
 	}
 
 	return &cfg, nil

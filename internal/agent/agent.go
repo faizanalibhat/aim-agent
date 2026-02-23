@@ -113,20 +113,32 @@ func (a *Agent) Start() error {
 	}
 
 	// 2. Start Heartbeat and Results Reporting Loops
-	ticker := time.NewTicker(time.Duration(a.cfg.Interval) * time.Second)
-	defer ticker.Stop()
+	hbTicker := time.NewTicker(time.Duration(a.cfg.HeartbeatInterval) * time.Second)
+	assetTicker := time.NewTicker(time.Duration(a.cfg.AssetPushInterval) * time.Second)
+	defer hbTicker.Stop()
+	defer assetTicker.Stop()
+
+	log.Printf("Heartbeat interval: %ds, Asset push interval: %ds", a.cfg.HeartbeatInterval, a.cfg.AssetPushInterval)
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-hbTicker.C:
 			// Send Heartbeat
-			respH, err := a.api.Heartbeat(a.cfg.AgentID)
+			resp, err := a.api.Heartbeat(a.cfg.AgentID)
 			if err != nil {
 				log.Printf("Heartbeat failed: %v", err)
-			} else if a.checkKill(respH) {
-				return nil
+			} else {
+				if a.checkKill(resp) {
+					return nil
+				}
+				if a.syncConfiguration(resp) {
+					log.Printf("Configuration updated. Heartbeat: %ds, Asset Push: %ds", a.cfg.HeartbeatInterval, a.cfg.AssetPushInterval)
+					hbTicker.Reset(time.Duration(a.cfg.HeartbeatInterval) * time.Second)
+					assetTicker.Reset(time.Duration(a.cfg.AssetPushInterval) * time.Second)
+				}
 			}
 
+		case <-assetTicker.C:
 			// Gather and Send Results
 			results, err := a.gatherAll()
 			if err != nil {
@@ -134,11 +146,18 @@ func (a *Agent) Start() error {
 				continue
 			}
 
-			respR, err := a.api.SendResults(a.cfg.AgentID, results)
+			resp, err := a.api.SendResults(a.cfg.AgentID, results)
 			if err != nil {
 				log.Printf("Failed to send results: %v", err)
-			} else if a.checkKill(respR) {
-				return nil
+			} else {
+				if a.checkKill(resp) {
+					return nil
+				}
+				if a.syncConfiguration(resp) {
+					log.Printf("Configuration updated from results response. Heartbeat: %ds, Asset Push: %ds", a.cfg.HeartbeatInterval, a.cfg.AssetPushInterval)
+					hbTicker.Reset(time.Duration(a.cfg.HeartbeatInterval) * time.Second)
+					assetTicker.Reset(time.Duration(a.cfg.AssetPushInterval) * time.Second)
+				}
 			}
 
 		case <-a.stop:
@@ -150,6 +169,30 @@ func (a *Agent) Start() error {
 
 func (a *Agent) Stop() {
 	close(a.stop)
+}
+
+func (a *Agent) syncConfiguration(resp *api.ResultsResponse) bool {
+	if resp == nil {
+		return false
+	}
+
+	changed := false
+	if resp.Configuration.HeartbeatInterval > 0 && resp.Configuration.HeartbeatInterval != a.cfg.HeartbeatInterval {
+		a.cfg.HeartbeatInterval = resp.Configuration.HeartbeatInterval
+		changed = true
+	}
+	if resp.Configuration.AssetPushInterval > 0 && resp.Configuration.AssetPushInterval != a.cfg.AssetPushInterval {
+		a.cfg.AssetPushInterval = resp.Configuration.AssetPushInterval
+		changed = true
+	}
+
+	if changed {
+		if err := config.SaveConfig(a.configPath, a.cfg); err != nil {
+			log.Printf("Failed to save updated configuration: %v", err)
+		}
+	}
+
+	return changed
 }
 
 func (a *Agent) checkKill(resp *api.ResultsResponse) bool {

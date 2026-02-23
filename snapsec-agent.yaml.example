@@ -6,5 +6,8 @@ backend_url: "http://localhost:8080"
 # API Key for authentication
 api_key: "your-api-key-here"
 
-# Interval in seconds for heartbeat and asset reporting
-interval: 5
+# Interval in seconds for heartbeat
+heartbeat_interval: 120
+
+# Interval in seconds for asset reporting
+asset_push_interval: 1800
