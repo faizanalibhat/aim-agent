@@ -15,6 +15,7 @@ import (
 	"snapsec-agent/internal/modules/security"
 	"snapsec-agent/internal/modules/services"
 	"snapsec-agent/internal/modules/users"
+	"snapsec-agent/internal/modules/classification"
 	"snapsec-agent/pkg/api"
 	"time"
 	"runtime"
@@ -44,6 +45,7 @@ func NewAgent(cfg *config.Config, configPath string) *Agent {
 			&devices.DevicesModule{},
 			&users.UsersModule{},
 			&security.SecurityModule{},
+			&classification.ClassificationModule{},
 		},
 		stop: make(chan struct{}),
 	}
