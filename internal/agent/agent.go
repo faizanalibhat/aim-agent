@@ -99,7 +99,6 @@ func (a *Agent) RegisterOnly() error {
 		architecture = "linux"
 	}
 
-	// Detect machine architecture
 	arch := runtime.GOARCH
 	// Handle common aliases if necessary (e.g., from uname -m style to go style)
 	// But runtime.GOARCH is already what we want for release filenames usually.
