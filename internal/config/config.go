@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var Version = "2.8.0"
+var Version = "2.9.0"
 
 type Config struct {
 	BackendURL        string `yaml:"backend_url"`
