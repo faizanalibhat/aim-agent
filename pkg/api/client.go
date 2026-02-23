@@ -57,9 +57,10 @@ func (c *Client) Register(hostname, os, version, ipAddress, architecture, arch s
 	return regResp.AgentID, nil
 }
 
-func (c *Client) Heartbeat(agentID string) (*ResultsResponse, error) {
+func (c *Client) Heartbeat(agentID, version string) (*ResultsResponse, error) {
 	data := map[string]string{
 		"agent_id":  agentID,
+		"version":   version,
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 	

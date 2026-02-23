@@ -143,7 +143,7 @@ func (a *Agent) Start() error {
 		select {
 		case <-hbTicker.C:
 			// Send Heartbeat
-			resp, err := a.api.Heartbeat(a.cfg.AgentID)
+			resp, err := a.api.Heartbeat(a.cfg.AgentID, config.Version)
 			if err != nil {
 				log.Printf("Heartbeat failed: %v", err)
 			} else {
