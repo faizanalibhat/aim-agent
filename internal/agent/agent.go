@@ -139,6 +139,18 @@ func (a *Agent) Start() error {
 
 	log.Printf("Heartbeat interval: %ds, Asset push interval: %ds", a.cfg.HeartbeatInterval, a.cfg.AssetPushInterval)
 
+	// 3. Initial Heartbeat to sync config and check for updates immediately
+	if resp, err := a.api.Heartbeat(a.cfg.AgentID, config.Version); err == nil {
+		if a.checkKill(resp) {
+			return nil
+		}
+		if a.syncConfiguration(resp) {
+			// Intervals might have changed, restart tickers
+			hbTicker.Reset(time.Duration(a.cfg.HeartbeatInterval) * time.Second)
+			assetTicker.Reset(time.Duration(a.cfg.AssetPushInterval) * time.Second)
+		}
+	}
+
 	for {
 		select {
 		case <-hbTicker.C:
