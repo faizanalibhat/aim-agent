@@ -54,6 +54,11 @@ func newService(cfg *config.Config, configPath string) (service.Service, error) 
 		os.Exit(0)
 	}
 
+	a.UpdateHandler = func() error {
+		log.Println("Restart signal received from updater. Restarting service...")
+		return s.Restart()
+	}
+
 	return s, nil
 }
 

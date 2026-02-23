@@ -29,13 +29,15 @@ type RegisterResponse struct {
 	AgentID string `json:"agent_id"`
 }
 
-func (c *Client) Register(hostname, os, version, ipAddress string) (string, error) {
+func (c *Client) Register(hostname, os, version, ipAddress, architecture, arch string) (string, error) {
 	data := map[string]string{
-		"hostname":   hostname,
-		"os":         os,
-		"version":    version,
-		"ipAddress": ipAddress,
-		"api_key":    c.APIKey,
+		"hostname":     hostname,
+		"os":           os,
+		"version":      version,
+		"ipAddress":    ipAddress,
+		"architecture": architecture,
+		"arch":         arch,
+		"api_key":      c.APIKey,
 	}
 
 	respBody, err := c.postWithResponse("/register", data)
@@ -75,9 +77,11 @@ func (c *Client) Heartbeat(agentID string) (*ResultsResponse, error) {
 }
 
 type AgentConfiguration struct {
-	Kill              bool `json:"kill"`
-	HeartbeatInterval int  `json:"heartbeat_interval"` // in seconds
-	AssetPushInterval int  `json:"asset_push_interval"` // in seconds
+	Kill              bool   `json:"kill"`
+	HeartbeatInterval int    `json:"heartbeat_interval"` // in seconds
+	AssetPushInterval int    `json:"asset_push_interval"` // in seconds
+	LatestVersion     string `json:"latest_version"`
+	DownloadURL       string `json:"download_url"`
 }
 
 type ResultsResponse struct {

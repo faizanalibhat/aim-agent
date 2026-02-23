@@ -19,6 +19,7 @@ import (
 	"snapsec-agent/pkg/api"
 	"time"
 	"runtime"
+	"snapsec-agent/internal/updater"
 )
 
 type Agent struct {
@@ -28,6 +29,7 @@ type Agent struct {
 	modules     []modules.Module
 	stop        chan struct{}
 	KillHandler func()
+	UpdateHandler func() error
 }
 
 func NewAgent(cfg *config.Config, configPath string) *Agent {
@@ -86,9 +88,25 @@ func (a *Agent) RegisterOnly() error {
 		}
 	}
 
-	log.Printf("Registering agent with hostname: %s, os: %s, ip: %s", hostname, osName, ipAddress)
+	// Determine architecture (Normalized OS)
+	architecture := "linux"
+	switch runtime.GOOS {
+	case "darwin":
+		architecture = "macos"
+	case "windows":
+		architecture = "windows"
+	default:
+		architecture = "linux"
+	}
 
-	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress)
+	// Detect machine architecture
+	arch := runtime.GOARCH
+	// Handle common aliases if necessary (e.g., from uname -m style to go style)
+	// But runtime.GOARCH is already what we want for release filenames usually.
+
+	log.Printf("Registering agent with hostname: %s, os: %s, architecture: %s, arch: %s, ip: %s", hostname, osName, architecture, arch, ipAddress)
+
+	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress, architecture, arch)
 	if err != nil {
 		return err
 	}
@@ -191,6 +209,29 @@ func (a *Agent) syncConfiguration(resp *api.ResultsResponse) bool {
 	if changed {
 		if err := config.SaveConfig(a.configPath, a.cfg); err != nil {
 			log.Printf("Failed to save updated configuration: %v", err)
+		}
+	}
+
+	// 2. Check for Software Updates
+	if resp.Configuration.LatestVersion != "" && resp.Configuration.LatestVersion != config.Version {
+		log.Printf("New version available: %s (current: %s). Starting auto-update...", resp.Configuration.LatestVersion, config.Version)
+		if resp.Configuration.DownloadURL == "" {
+			log.Printf("Download URL is empty. Update aborted.")
+			return changed
+		}
+
+		if err := updater.Update(resp.Configuration.DownloadURL); err != nil {
+			log.Printf("Update failed: %v", err)
+			return changed
+		}
+
+		log.Println("Update successful. Triggering agent restart...")
+		if a.UpdateHandler != nil {
+			if err := a.UpdateHandler(); err != nil {
+				log.Printf("Failed to trigger restart: %v", err)
+			}
+		} else {
+			log.Println("UpdateHandler not set. Manual restart required.")
 		}
 	}
 
