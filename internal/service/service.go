@@ -62,7 +62,7 @@ func newService(cfg *config.Config, configPath string) (service.Service, error) 
 	return s, nil
 }
 
-func AutoHandle(cfg *config.Config, configPath string) error {
+func AutoHandle(cfg *config.Config, configPath string, foreground bool) error {
 	s, err := newService(cfg, configPath)
 	if err != nil {
 		return err
@@ -70,38 +70,49 @@ func AutoHandle(cfg *config.Config, configPath string) error {
 
 	// Check if we are running interactively or as a service
 	if service.Interactive() {
-		status, err := s.Status()
-		if err != nil || status == service.StatusUnknown {
-			log.Println("Agent not installed. Starting installation process...")
-
-			// 1. Register with backend
-			a := agent.NewAgent(cfg, configPath)
-			log.Println("Registering agent with backend...")
-			if err := a.RegisterOnly(); err != nil {
-				return fmt.Errorf("registration failed (installation aborted): %w", err)
-			}
-			log.Println("Registration successful.")
-
-			// 2. Install as service
-			log.Println("Installing service...")
-			if err := s.Install(); err != nil {
-				return fmt.Errorf("failed to install service: %w", err)
-			}
-
-			// 3. Start service
-			log.Println("Starting service...")
-			if err := s.Start(); err != nil {
-				return fmt.Errorf("failed to start service: %w", err)
-			}
-
-			log.Println("Snapsec Agent installed and started successfully.")
-			return nil
+		if foreground {
+			return s.Run()
 		}
 
-		// If already installed but run interactively, maybe the user wants to manage it?
-		// For now, we'll just run it interactively to allow debugging.
-		log.Println("Agent already installed. Running in interactive mode...")
+		status, err := s.Status()
+		
+		// 1. Ensure/Update registration with backend
+		a := agent.NewAgent(cfg, configPath)
+		log.Println("Registering agent with backend...")
+		if err := a.RegisterOnly(); err != nil {
+			return fmt.Errorf("registration failed: %w", err)
+		}
+
+		// 2. Install as service if not present
+		if err != nil || status == service.StatusUnknown {
+			log.Println("Installing service...")
+			if err := s.Install(); err != nil {
+				log.Printf("Service installation warning: %v", err)
+			}
+		}
+
+		// 3. Handle service starting/restarting
+		if status == service.StatusRunning {
+			log.Println("Agent already running as a service. Restarting to apply changes...")
+			if err := s.Restart(); err != nil {
+				return fmt.Errorf("failed to restart service: %w", err)
+			}
+			log.Println("Snapsec Agent service restarted successfully.")
+		} else {
+			log.Println("Starting agent service...")
+			if err := s.Start(); err != nil {
+				// Fallback to restart if start fails (e.g. status was cached)
+				if err := s.Restart(); err != nil {
+					return fmt.Errorf("failed to start agent service: %w", err)
+				}
+			}
+			log.Println("Snapsec Agent service started successfully.")
+		}
+
+		log.Println("Installation/Update complete. Agent is running in the background.")
+		return nil
 	}
 
 	return s.Run()
 }
+

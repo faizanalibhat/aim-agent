@@ -11,6 +11,8 @@ import (
 
 func main() {
 	configPath := flag.String("config", config.GetDefaultConfigPath(), "Path to configuration file")
+	foreground := flag.Bool("f", false, "Run in foreground (interactive mode)")
+	flag.BoolVar(foreground, "foreground", false, "Run in foreground (interactive mode)")
 	flag.Parse()
 
 	// Load configuration
@@ -22,9 +24,9 @@ func main() {
 		os.Exit(1)
 	}
 
-
 	// AutoHandle will install/register if not installed, or run if already installed.
-	if err := service.AutoHandle(cfg, *configPath); err != nil {
+	if err := service.AutoHandle(cfg, *configPath, *foreground); err != nil {
 		log.Fatal(err)
 	}
 }
+
