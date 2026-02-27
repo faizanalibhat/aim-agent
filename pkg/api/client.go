@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -120,28 +121,40 @@ func (c *Client) postWithResponse(endpoint string, data interface{}) ([]byte, er
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, err
+	maxRetries := 3
+	backoff := 2 * time.Second
+
+	var lastErr error
+	for i := 0; i <= maxRetries; i++ {
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-API-Key", c.APIKey)
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			lastErr = err
+		} else {
+			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				lastErr = err
+			} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNotFound {
+				lastErr = fmt.Errorf("backend returned status: %d, body: %s", resp.StatusCode, string(body))
+			} else {
+				return body, nil
+			}
+		}
+
+		if i < maxRetries {
+			log.Printf("Request to %s failed: %v. Retrying in %v (attempt %d/%d)...", endpoint, lastErr, backoff, i+1, maxRetries)
+			time.Sleep(backoff)
+			backoff *= 2
+		}
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", c.APIKey)
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNotFound {
-		return nil, fmt.Errorf("backend returned status: %d, body: %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
+	return nil, fmt.Errorf("request to %s failed after %d retries: %w", endpoint, maxRetries, lastErr)
 }
