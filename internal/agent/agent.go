@@ -105,9 +105,23 @@ func (a *Agent) RegisterOnly() error {
 
 	log.Printf("Registering agent with hostname: %s, os: %s, architecture: %s, arch: %s, ip: %s", hostname, osName, architecture, arch, ipAddress)
 
-	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress, architecture, arch)
-	if err != nil {
-		return err
+	var agentID string
+	maxRetries := 3
+	backoff := 2 * time.Second
+
+	for i := 0; i <= maxRetries; i++ {
+		agentID, err = a.api.Register(hostname, osName, config.Version, ipAddress, architecture, arch)
+		if err == nil {
+			break
+		}
+
+		if i < maxRetries {
+			log.Printf("Registration attempt %d failed: %v. Retrying in %v...", i+1, err, backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+		} else {
+			return fmt.Errorf("registration failed after %d retries: %w", maxRetries, err)
+		}
 	}
 
 	log.Printf("Registration successful. Assigned Agent ID: %s", agentID)
