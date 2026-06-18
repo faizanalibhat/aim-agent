@@ -105,7 +105,16 @@ func (a *Agent) RegisterOnly() error {
 
 	log.Printf("Registering agent with hostname: %s, os: %s, architecture: %s, arch: %s, ip: %s", hostname, osName, architecture, arch, ipAddress)
 
-	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress, architecture, arch)
+	// Gather the full inventory so the backend can create the workstation/server
+	// (and technology) assets immediately on registration, rather than waiting
+	// for the first scheduled asset push. Best-effort: register even if it fails.
+	inventory, gErr := a.gatherAll()
+	if gErr != nil {
+		log.Printf("Failed to gather inventory for registration: %v", gErr)
+		inventory = nil
+	}
+
+	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress, architecture, arch, inventory)
 	if err != nil {
 		return err
 	}

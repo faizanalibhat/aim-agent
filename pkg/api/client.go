@@ -30,8 +30,12 @@ type RegisterResponse struct {
 	AgentID string `json:"agent_id"`
 }
 
-func (c *Client) Register(hostname, os, version, ipAddress, architecture, arch string) (string, error) {
-	data := map[string]string{
+// Register registers the agent. When inventory is non-nil it is sent under the
+// "data" key (same shape as the results push) so the backend can create the
+// workstation/server assets immediately at registration, without waiting for
+// the first scheduled asset push.
+func (c *Client) Register(hostname, os, version, ipAddress, architecture, arch string, inventory interface{}) (string, error) {
+	data := map[string]interface{}{
 		"hostname":     hostname,
 		"os":           os,
 		"version":      version,
@@ -39,6 +43,9 @@ func (c *Client) Register(hostname, os, version, ipAddress, architecture, arch s
 		"architecture": architecture,
 		"arch":         arch,
 		"api_key":      c.APIKey,
+	}
+	if inventory != nil {
+		data["data"] = inventory
 	}
 
 	respBody, err := c.postWithResponse("/register", data)
