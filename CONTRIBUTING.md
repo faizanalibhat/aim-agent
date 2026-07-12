@@ -87,7 +87,7 @@ func NewAgent(cfg *config.Config, configPath string) *Agent {
 Build the agent and run it interactively to see the output:
 
 ```bash
-go build -o snapsec-agent ./cmd/agent
+go build -ldflags="-X main.version=$(git describe --tags --always)" -o snapsec-agent ./cmd/agent
 sudo ./snapsec-agent
 ```
 

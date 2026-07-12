@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var Version = "3.0.0"
+var Version = "dev" // Overridden by ldflags during build
 
 type Config struct {
 	BackendURL        string `yaml:"backend_url"`
