@@ -105,7 +105,16 @@ func (a *Agent) RegisterOnly() error {
 
 	log.Printf("Registering agent with hostname: %s, os: %s, architecture: %s, arch: %s, ip: %s", hostname, osName, architecture, arch, ipAddress)
 
-	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress, architecture, arch)
+	// Gather the full inventory so the backend can create the workstation/server
+	// (and technology) assets immediately on registration, rather than waiting
+	// for the first scheduled asset push. Best-effort: register even if it fails.
+	inventory, gErr := a.gatherAll()
+	if gErr != nil {
+		log.Printf("Failed to gather inventory for registration: %v", gErr)
+		inventory = nil
+	}
+
+	agentID, err := a.api.Register(hostname, osName, config.Version, ipAddress, architecture, arch, inventory)
 	if err != nil {
 		return err
 	}
@@ -149,6 +158,25 @@ func (a *Agent) Start() error {
 			hbTicker.Reset(time.Duration(a.cfg.HeartbeatInterval) * time.Second)
 			assetTicker.Reset(time.Duration(a.cfg.AssetPushInterval) * time.Second)
 		}
+	}
+
+	// 4. Initial Asset Push
+	// Send immediate asset results so we don't wait for the first scheduled asset push ticker.
+	log.Println("Gathering and sending initial asset results...")
+	if payload, err := a.gatherAll(); err == nil {
+		if resp, err := a.api.SendResults(a.cfg.AgentID, payload); err != nil {
+			log.Printf("Failed to send initial results: %v", err)
+		} else {
+			if a.checkKill(resp) {
+				return nil
+			}
+			if a.syncConfiguration(resp) {
+				hbTicker.Reset(time.Duration(a.cfg.HeartbeatInterval) * time.Second)
+				assetTicker.Reset(time.Duration(a.cfg.AssetPushInterval) * time.Second)
+			}
+		}
+	} else {
+		log.Printf("Failed to gather initial results: %v", err)
 	}
 
 	for {
