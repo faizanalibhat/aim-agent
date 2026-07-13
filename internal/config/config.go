@@ -15,6 +15,7 @@ type Config struct {
 	AgentID           string `yaml:"agent_id,omitempty"`
 	HeartbeatInterval int    `yaml:"heartbeat_interval"` // in seconds
 	AssetPushInterval int    `yaml:"asset_push_interval"` // in seconds
+	VulnScanInterval  int    `yaml:"vuln_scan_interval"` // in seconds
 }
 
 func GetDefaultConfigPath() string {
@@ -41,6 +42,10 @@ func LoadConfig(path string) (*Config, error) {
 
 	if cfg.AssetPushInterval == 0 {
 		cfg.AssetPushInterval = 1800 // Default to 30 minutes
+	}
+
+	if cfg.VulnScanInterval == 0 {
+		cfg.VulnScanInterval = 86400 // Default to 24 hours
 	}
 
 	return &cfg, nil

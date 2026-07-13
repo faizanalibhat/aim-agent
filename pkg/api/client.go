@@ -86,11 +86,13 @@ func (c *Client) Heartbeat(agentID, version string) (*ResultsResponse, error) {
 }
 
 type AgentConfiguration struct {
-	Kill              bool   `json:"kill"`
-	HeartbeatInterval int    `json:"heartbeat_interval"` // in seconds
-	AssetPushInterval int    `json:"asset_push_interval"` // in seconds
-	LatestVersion     string `json:"latest_version"`
-	DownloadURL       string `json:"download_url"`
+	Kill              bool                   `json:"kill"`
+	HeartbeatInterval int                    `json:"heartbeat_interval"` // in seconds
+	AssetPushInterval int                    `json:"asset_push_interval"` // in seconds
+	VulnScanInterval  int                    `json:"vuln_scan_interval,omitempty"` // in seconds
+	ScanJobs          []interface{}          `json:"scan_jobs,omitempty"`
+	LatestVersion     string                 `json:"latest_version"`
+	DownloadURL       string                 `json:"download_url"`
 }
 
 type ResultsResponse struct {
@@ -104,6 +106,25 @@ func (c *Client) SendResults(agentID string, results interface{}) (*ResultsRespo
 	}
 
 	respBody, err := c.postWithResponse("/results", data)
+	if err != nil {
+		return nil, err
+	}
+
+	var res ResultsResponse
+	if err := json.Unmarshal(respBody, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
+func (c *Client) SendVulnerabilities(agentID string, findings interface{}) (*ResultsResponse, error) {
+	data := map[string]interface{}{
+		"agent_id": agentID,
+		"data":     findings,
+	}
+
+	respBody, err := c.postWithResponse("/vulnerabilities", data)
 	if err != nil {
 		return nil, err
 	}

@@ -20,6 +20,9 @@ import (
 	"time"
 	"runtime"
 	"snapsec-agent/internal/updater"
+	"snapsec-agent/internal/vulnscan"
+	"snapsec-agent/internal/vulnscan/nuclei"
+	"encoding/json"
 )
 
 type Agent struct {
@@ -27,13 +30,14 @@ type Agent struct {
 	configPath  string
 	api         *api.Client
 	modules     []modules.Module
-	stop        chan struct{}
-	KillHandler func()
+	stop          chan struct{}
+	scanManager   *vulnscan.ScanManager
+	KillHandler   func()
 	UpdateHandler func() error
 }
 
 func NewAgent(cfg *config.Config, configPath string) *Agent {
-	return &Agent{
+	agent := &Agent{
 		cfg:        cfg,
 		configPath: configPath,
 		api:        api.NewClient(cfg.BackendURL, cfg.APIKey),
@@ -51,6 +55,32 @@ func NewAgent(cfg *config.Config, configPath string) *Agent {
 		},
 		stop: make(chan struct{}),
 	}
+	
+	// Initialize VulnScanManager
+	pluginCfg := vulnscan.PluginConfig{
+		BinDir:      "/var/lib/snapsec/bin",
+		TemplateDir: "/var/lib/snapsec/templates",
+	}
+	if runtime.GOOS == "windows" {
+		pluginCfg.BinDir = "C:\\ProgramData\\snapsec-agent\\bin"
+		pluginCfg.TemplateDir = "C:\\ProgramData\\snapsec-agent\\templates"
+	}
+	
+	agent.scanManager = vulnscan.NewScanManager(pluginCfg, func(findings []vulnscan.NormalizedFinding) {
+		if len(findings) > 0 {
+			if _, err := agent.api.SendVulnerabilities(agent.cfg.AgentID, findings); err != nil {
+				log.Printf("Failed to send vulnerabilities: %v", err)
+			}
+		}
+	})
+	
+	// Register Nuclei
+	if err := agent.scanManager.RegisterPlugin("nuclei", &nuclei.NucleiScanner{}); err != nil {
+		log.Printf("Failed to initialize nuclei plugin: %v", err)
+	}
+	
+	agent.scanManager.SetScanInterval(cfg.VulnScanInterval)
+	return agent
 }
 
 func (a *Agent) RegisterOnly() error {
@@ -140,6 +170,8 @@ func (a *Agent) Start() error {
 		}
 	}
 
+	a.scanManager.Start()
+
 	// 2. Start Heartbeat and Results Reporting Loops
 	hbTicker := time.NewTicker(time.Duration(a.cfg.HeartbeatInterval) * time.Second)
 	assetTicker := time.NewTicker(time.Duration(a.cfg.AssetPushInterval) * time.Second)
@@ -228,6 +260,7 @@ func (a *Agent) Start() error {
 
 func (a *Agent) Stop() {
 	close(a.stop)
+	a.scanManager.Stop()
 }
 
 func (a *Agent) syncConfiguration(resp *api.ResultsResponse) bool {
@@ -243,6 +276,28 @@ func (a *Agent) syncConfiguration(resp *api.ResultsResponse) bool {
 	if resp.Configuration.AssetPushInterval > 0 && resp.Configuration.AssetPushInterval != a.cfg.AssetPushInterval {
 		a.cfg.AssetPushInterval = resp.Configuration.AssetPushInterval
 		changed = true
+	}
+	if resp.Configuration.VulnScanInterval > 0 && resp.Configuration.VulnScanInterval != a.cfg.VulnScanInterval {
+		a.cfg.VulnScanInterval = resp.Configuration.VulnScanInterval
+		a.scanManager.SetScanInterval(a.cfg.VulnScanInterval)
+		changed = true
+	}
+
+	// Trigger manual scan jobs if any
+	if len(resp.Configuration.ScanJobs) > 0 {
+		var jobs []vulnscan.ScanJob
+		for _, rawJob := range resp.Configuration.ScanJobs {
+			b, err := json.Marshal(rawJob)
+			if err == nil {
+				var job vulnscan.ScanJob
+				if err := json.Unmarshal(b, &job); err == nil {
+					jobs = append(jobs, job)
+				}
+			}
+		}
+		if len(jobs) > 0 {
+			a.scanManager.RunJobs(jobs)
+		}
 	}
 
 	if changed {
