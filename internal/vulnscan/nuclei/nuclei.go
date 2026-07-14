@@ -172,10 +172,26 @@ func (n *NucleiScanner) Execute(ctx context.Context, job vulnscan.ScanJob) (vuln
 		"-l", targetFile.Name(),
 		"-json-export", outputFile.Name(),
 		"-ud", templatesPath,
-		"-silent",
+	}
+
+	if pt, ok := job.Options["protocol"]; ok && pt != "" {
+		args = append(args, "-pt", pt)
+	}
+	if tags, ok := job.Options["tags"]; ok && tags != "" {
+		args = append(args, "-tags", tags)
+	}
+
+	isVerbose := job.Options["verbose"] == "true"
+	if !isVerbose {
+		args = append(args, "-silent")
 	}
 
 	cmd := exec.CommandContext(ctx, n.binPath, args...)
+	
+	if isVerbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	
 	// Run the command
 	if err := cmd.Run(); err != nil {

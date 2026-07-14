@@ -3,6 +3,8 @@ package vulnscan
 import (
 	"context"
 	"log"
+	"os"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -74,15 +76,64 @@ func (m *ScanManager) runLoop() {
 	}
 }
 
+func getLocalScanTargets() []string {
+	var candidates []string
+	switch runtime.GOOS {
+	case "windows":
+		candidates = []string{
+			"C:\\Windows\\System32\\drivers\\etc",
+			"C:\\ProgramData",
+			"C:\\inetpub",
+			"C:\\Users",
+			"C:\\Program Files",
+			"C:\\Program Files (x86)",
+		}
+	case "darwin":
+		candidates = []string{
+			"/etc",
+			"/Library",
+			"/Applications",
+			"/Users",
+			"/usr/local/etc",
+		}
+	default:
+		candidates = []string{
+			"/etc",
+			"/usr/local/etc",
+			"/opt",
+			"/var/www",
+			"/home",
+			"/var/lib/docker",
+			"/etc/kubernetes",
+		}
+	}
+
+	var targets []string
+	for _, dir := range candidates {
+		if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
+			targets = append(targets, dir)
+		}
+	}
+	return targets
+}
+
 func (m *ScanManager) RunScheduledScan() {
 	log.Println("Starting scheduled vulnerability scan...")
 	
+	targets := getLocalScanTargets()
+	if len(targets) == 0 {
+		targets = []string{"localhost"}
+	}
+
 	for name, plugin := range m.plugins {
-		// Create a generic job for the local host. For real use, targets might be based on local interfaces/services.
 		job := ScanJob{
 			ID:      "scheduled-" + name + "-" + time.Now().Format("20060102150405"),
 			Tool:    name,
-			Targets: []string{"localhost"},
+			Targets: targets,
+			Options: map[string]string{
+				"protocol": "file",
+				"tags":     "secrets,keys,tokens,credentials,misconfiguration",
+			},
 		}
 		
 		go m.RunJob(plugin, job)
@@ -114,5 +165,45 @@ func (m *ScanManager) RunJob(plugin ScannerPlugin, job ScanJob) {
 	log.Printf("Scan job %s completed with %d findings", job.ID, len(result.Findings))
 	if len(result.Findings) > 0 && m.resultHandler != nil {
 		m.resultHandler(result.Findings)
+	}
+}
+
+func (m *ScanManager) RunCLI(tool string, target string) {
+	var targets []string
+	if target == "" {
+		targets = getLocalScanTargets()
+		if len(targets) == 0 {
+			if runtime.GOOS == "windows" {
+				targets = []string{"C:\\"}
+			} else {
+				targets = []string{"."}
+			}
+		}
+	} else {
+		targets = []string{target}
+	}
+
+	for name, plugin := range m.plugins {
+		if tool != "" && name != tool {
+			continue
+		}
+
+		job := ScanJob{
+			ID:      "cli-" + name + "-" + time.Now().Format("20060102150405"),
+			Tool:    name,
+			Targets: targets,
+			Options: map[string]string{
+				"protocol": "file",
+				"tags":     "secrets,keys,tokens,credentials,misconfiguration",
+				"verbose":  "true",
+			},
+		}
+
+		// Run synchronously for CLI
+		m.wg.Add(1)
+		func() {
+			defer m.wg.Done()
+			m.RunJob(plugin, job)
+		}()
 	}
 }
