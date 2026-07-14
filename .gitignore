@@ -1,0 +1,18 @@
+# Compiled binaries
+bin/
+*.exe
+*.out
+*.app
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+
+# Temporary nuclei outputs
+nuclei-targets-*.txt
+nuclei-output-*.json
+*.jsonl
