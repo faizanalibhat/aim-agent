@@ -172,8 +172,8 @@ func (n *NucleiScanner) Execute(ctx context.Context, job vulnscan.ScanJob) (vuln
 		"-l", targetFile.Name(),
 		"-json-export", outputFile.Name(),
 		"-ud", templatesPath,
-		"-c", "10", // Limit concurrent templates
-		"-bs", "5", // Limit concurrent targets
+		"-c", "2", // Limit concurrent templates
+		"-bs", "2", // Limit concurrent targets
 	}
 
 	if pt, ok := job.Options["protocol"]; ok && pt != "" {
