@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"snapsec-agent/internal/config"
+	"snapsec-agent/internal/cpulimit"
 	"snapsec-agent/internal/service"
 	"snapsec-agent/internal/vulnscan"
 	"snapsec-agent/internal/vulnscan/nuclei"
@@ -15,6 +16,10 @@ import (
 )
 
 func main() {
+	if err := cpulimit.Apply(); err != nil {
+		log.Printf("Warning: failed to apply CPU limits: %v", err)
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "scan" {
 		scanCmd := flag.NewFlagSet("scan", flag.ExitOnError)
 		toolFlag := scanCmd.String("tool", "", "Specific tool to run (e.g., nuclei)")
