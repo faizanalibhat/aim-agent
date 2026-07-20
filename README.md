@@ -22,7 +22,7 @@ A cross-platform security agent written in Go.
 
 ### 1. Build the agent
 ```bash
-go build -o snapsec-agent ./cmd/agent
+go build -o bin/snapsec-agent ./cmd/agent
 ```
 
 ### 2. Configure

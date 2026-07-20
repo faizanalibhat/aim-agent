@@ -13,7 +13,7 @@ If you are developing on a macOS or Linux machine, you can run the agent nativel
 
 1. **Build the agent:**
    ```bash
-   go build -o bin/aim-agent ./cmd/agent
+   go build -o bin/snapsec-agent ./cmd/agent
    ```
 2. **Create your config file:**
    Create a configuration file at `/etc/snapsec-agent.yaml` (Linux) or `/usr/local/etc/snapsec-agent.yaml` (Mac) containing your API key and backend URL.
@@ -34,7 +34,7 @@ If you are developing on a macOS or Linux machine, you can run the agent nativel
 
 1. **Build the agent:**
    ```powershell
-   go build -o bin/aim-agent.exe ./cmd/agent
+   go build -o bin/snapsec-agent.exe ./cmd/agent
    ```
 2. **Run the scan (requires Administrator PowerShell):**
    ```powershell
@@ -52,7 +52,7 @@ Open PowerShell in the `aim-agent` directory and run:
 ```powershell
 $env:GOOS="linux"
 $env:GOARCH="amd64"
-go build -o bin/aim-agent-linux ./cmd/agent
+go build -o bin/snapsec-agent-linux ./cmd/agent
 ```
 
 ### Step 2: Transfer to the VM

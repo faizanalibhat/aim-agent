@@ -12,6 +12,7 @@ import (
 	"snapsec-agent/internal/service"
 	"snapsec-agent/internal/vulnscan"
 	"snapsec-agent/internal/vulnscan/nuclei"
+	"snapsec-agent/internal/vulnscan/trivy"
 	"snapsec-agent/pkg/api"
 )
 
@@ -68,6 +69,10 @@ func main() {
 
 		if err := manager.RegisterPlugin("nuclei", &nuclei.NucleiScanner{}); err != nil {
 			log.Fatalf("Failed to initialize nuclei plugin: %v", err)
+		}
+
+		if err := manager.RegisterPlugin("trivy", &trivy.TrivyScanner{}); err != nil {
+			log.Fatalf("Failed to initialize trivy plugin: %v", err)
 		}
 
 		manager.RunCLI(*toolFlag, *targetFlag)
