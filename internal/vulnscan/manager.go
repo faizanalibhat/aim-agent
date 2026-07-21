@@ -152,8 +152,7 @@ func (m *ScanManager) RunJobs(jobs []ScanJob) {
 }
 
 func (m *ScanManager) RunJob(plugin ScannerPlugin, job ScanJob) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
-	defer cancel()
+	ctx := context.Background()
 
 	log.Printf("Executing scan job %s with tool %s", job.ID, job.Tool)
 	result, err := plugin.Execute(ctx, job)
@@ -168,7 +167,7 @@ func (m *ScanManager) RunJob(plugin ScannerPlugin, job ScanJob) {
 	}
 }
 
-func (m *ScanManager) RunCLI(tool string, target string) {
+func (m *ScanManager) RunCLI(tool string, target string, resume string) {
 	var targets []string
 	if target == "" {
 		targets = getLocalScanTargets()
@@ -197,6 +196,10 @@ func (m *ScanManager) RunCLI(tool string, target string) {
 				"tags":     "secrets,keys,tokens,credentials,misconfiguration",
 				"verbose":  "true",
 			},
+		}
+
+		if resume != "" {
+			job.Options["resume"] = resume
 		}
 
 		// Run synchronously for CLI

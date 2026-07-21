@@ -25,6 +25,7 @@ func main() {
 		toolFlag := scanCmd.String("tool", "", "Specific tool to run (e.g., nuclei)")
 		outputFlag := scanCmd.String("output", "", "Output file for JSON results")
 		targetFlag := scanCmd.String("target", "", "Target to scan (e.g. /etc, C:\\, or example.com)")
+		resumeFlag := scanCmd.String("resume", "", "Path to Nuclei resume.cfg to continue a crashed scan")
 		configPath := scanCmd.String("config", config.GetDefaultConfigPath(), "Path to configuration file")
 
 		scanCmd.Parse(os.Args[2:])
@@ -70,7 +71,7 @@ func main() {
 			log.Fatalf("Failed to initialize trivy plugin: %v", err)
 		}
 
-		manager.RunCLI(*toolFlag, *targetFlag)
+		manager.RunCLI(*toolFlag, *targetFlag, *resumeFlag)
 		manager.Stop()
 		return
 	}

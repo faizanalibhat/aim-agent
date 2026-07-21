@@ -172,8 +172,9 @@ func (n *NucleiScanner) Execute(ctx context.Context, job vulnscan.ScanJob) (vuln
 		"-l", targetFile.Name(),
 		"-json-export", outputFile.Name(),
 		"-ud", templatesPath,
-		"-c", "2", // Limit concurrent templates
-		"-bs", "2", // Limit concurrent targets
+		"-c", "8",
+		"-bs", "8",
+		"-rl", "100",
 	}
 
 	if pt, ok := job.Options["protocol"]; ok && pt != "" {
@@ -181,6 +182,9 @@ func (n *NucleiScanner) Execute(ctx context.Context, job vulnscan.ScanJob) (vuln
 	}
 	if tags, ok := job.Options["tags"]; ok && tags != "" {
 		args = append(args, "-tags", tags)
+	}
+	if resumePath, ok := job.Options["resume"]; ok && resumePath != "" {
+		args = append(args, "-resume", resumePath)
 	}
 
 	isVerbose := job.Options["verbose"] == "true"
