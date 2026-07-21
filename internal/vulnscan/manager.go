@@ -163,7 +163,7 @@ func (m *ScanManager) RunJob(plugin ScannerPlugin, job ScanJob) {
 	}
 
 	log.Printf("Scan job %s completed with %d findings", job.ID, len(result.Findings))
-	if len(result.Findings) > 0 && m.resultHandler != nil {
+	if m.resultHandler != nil {
 		m.resultHandler(result.Findings)
 	}
 }
