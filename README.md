@@ -79,3 +79,22 @@ The agent expects the following endpoints on the backend:
 - `POST /register`: Initial registration with host details.
 - `POST /heartbeat`: Periodic heartbeat.
 - `POST /assets`: Periodic asset data reporting.
+
+## Scanning Configuration
+
+The agent includes a highly optimized Nuclei scanning engine designed to run silently in the background without disrupting the host machine's performance.
+
+### Performance Throttling
+To prevent CPU spikes and memory exhaustion (OOM), the Nuclei engine is hardcoded with the following "sweet spot" configuration for endpoint agents:
+- **`-c 8` (Concurrency)**: Runs exactly 8 vulnerability templates simultaneously. This bounds memory strictly under 100MB.
+- **`-bs 8` (Batch Size)**: Processes 8 files at a time per template. This prevents the OS from running out of file descriptors.
+- **`-rl 100` (Rate Limiting)**: Caps the scanner to 100 file reads/regex evaluations per second. This serves as a natural throttle to ensure the user's CPU never spikes to 100%.
+- **No Timeout**: The 2-hour timeout limit has been removed, ensuring full filesystem scans can complete even if heavily throttled.
+
+### Resuming Interrupted Scans
+If the agent is forcefully killed, crashes, or the host machine reboots during a scan, you can resume exactly where it left off. Nuclei automatically generates a state file when interrupted.
+
+To resume an interrupted scan:
+```bash
+sudo ./snapsec-agent scan --tool=nuclei --target=/ --resume=path/to/resume.cfg
+```
