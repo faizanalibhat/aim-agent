@@ -58,12 +58,8 @@ func NewAgent(cfg *config.Config, configPath string) *Agent {
 	
 	// Initialize VulnScanManager
 	pluginCfg := vulnscan.PluginConfig{
-		BinDir:      "/var/lib/snapsec/bin",
-		TemplateDir: "/var/lib/snapsec/templates",
-	}
-	if runtime.GOOS == "windows" {
-		pluginCfg.BinDir = "C:\\ProgramData\\snapsec-agent\\bin"
-		pluginCfg.TemplateDir = "C:\\ProgramData\\snapsec-agent\\templates"
+		BinDir:      "./bin",
+		TemplateDir: "./templates",
 	}
 	
 	agent.scanManager = vulnscan.NewScanManager(pluginCfg, func(findings []vulnscan.NormalizedFinding) {

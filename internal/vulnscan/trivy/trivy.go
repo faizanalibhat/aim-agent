@@ -50,7 +50,7 @@ func (t *TrivyScanner) Init(config vulnscan.PluginConfig) error {
 }
 
 func (t *TrivyScanner) downloadTrivy() error {
-	version := "0.53.0"
+	version := "0.72.0"
 	osName := runtime.GOOS
 	if osName == "darwin" {
 		osName = "macOS"

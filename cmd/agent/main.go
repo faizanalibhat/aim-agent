@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime"
 	"snapsec-agent/internal/config"
 	"snapsec-agent/internal/cpulimit"
 	"snapsec-agent/internal/service"
@@ -38,12 +37,8 @@ func main() {
 		apiClient := api.NewClient(cfg.BackendURL, cfg.APIKey)
 
 		pluginCfg := vulnscan.PluginConfig{
-			BinDir:      "/var/lib/snapsec/bin",
-			TemplateDir: "/var/lib/snapsec/templates",
-		}
-		if runtime.GOOS == "windows" {
-			pluginCfg.BinDir = "C:\\ProgramData\\snapsec-agent\\bin"
-			pluginCfg.TemplateDir = "C:\\ProgramData\\snapsec-agent\\templates"
+			BinDir:      "./bin",
+			TemplateDir: "./templates",
 		}
 
 		manager := vulnscan.NewScanManager(pluginCfg, func(findings []vulnscan.NormalizedFinding) {
