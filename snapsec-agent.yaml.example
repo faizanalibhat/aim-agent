@@ -11,3 +11,9 @@ heartbeat_interval: 120
 
 # Interval in seconds for asset reporting
 asset_push_interval: 1800
+
+# Directories to explicitly include in vulnerability scans
+include_dirs: []
+
+# Directories/paths to exclude from vulnerability scans
+exclude_dirs: []

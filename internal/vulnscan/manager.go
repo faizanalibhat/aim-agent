@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -16,6 +17,8 @@ type ScanManager struct {
 	stopCh        chan struct{}
 	wg            sync.WaitGroup
 	resultHandler func([]NormalizedFinding)
+	includes      []string
+	excludes      []string
 }
 
 func NewScanManager(config PluginConfig, handler func([]NormalizedFinding)) *ScanManager {
@@ -33,6 +36,11 @@ func (m *ScanManager) RegisterPlugin(name string, plugin ScannerPlugin) error {
 	}
 	m.plugins[name] = plugin
 	return nil
+}
+
+func (m *ScanManager) UpdateTargets(includes []string, excludes []string) {
+	m.includes = includes
+	m.excludes = excludes
 }
 
 func (m *ScanManager) SetScanInterval(intervalSeconds int) {
@@ -76,53 +84,18 @@ func (m *ScanManager) runLoop() {
 	}
 }
 
-func getLocalScanTargets() []string {
-	var candidates []string
-	switch runtime.GOOS {
-	case "windows":
-		candidates = []string{
-			"C:\\Windows\\System32\\drivers\\etc",
-			"C:\\ProgramData",
-			"C:\\inetpub",
-			"C:\\Users",
-			"C:\\Program Files",
-			"C:\\Program Files (x86)",
-		}
-	case "darwin":
-		candidates = []string{
-			"/etc",
-			"/Library",
-			"/Applications",
-			"/Users",
-			"/usr/local/etc",
-		}
-	default:
-		candidates = []string{
-			"/etc",
-			"/usr/local/etc",
-			"/opt",
-			"/var/www",
-			"/home",
-			"/var/lib/docker",
-			"/etc/kubernetes",
-		}
-	}
-
-	var targets []string
-	for _, dir := range candidates {
-		if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
-			targets = append(targets, dir)
-		}
-	}
-	return targets
-}
-
 func (m *ScanManager) RunScheduledScan() {
 	log.Println("Starting scheduled vulnerability scan...")
 	
-	targets := getLocalScanTargets()
+	targets := m.includes
+	excludes := m.excludes
+	
 	if len(targets) == 0 {
-		targets = []string{"localhost"}
+		if runtime.GOOS == "windows" {
+			targets = []string{"C:\\"}
+		} else {
+			targets = []string{"/"}
+		}
 	}
 
 	for name, plugin := range m.plugins {
@@ -134,6 +107,10 @@ func (m *ScanManager) RunScheduledScan() {
 				"protocol": "file",
 				"tags":     "secrets,keys,tokens,credentials,misconfiguration",
 			},
+		}
+		
+		if len(excludes) > 0 {
+			job.Options["excludes"] = strings.Join(excludes, ",")
 		}
 		
 		go m.RunJob(plugin, job)
@@ -169,13 +146,15 @@ func (m *ScanManager) RunJob(plugin ScannerPlugin, job ScanJob) {
 
 func (m *ScanManager) RunCLI(tool string, target string, resume string) {
 	var targets []string
+	var excludes []string
 	if target == "" {
-		targets = getLocalScanTargets()
+		targets = m.includes
+		excludes = m.excludes
 		if len(targets) == 0 {
 			if runtime.GOOS == "windows" {
 				targets = []string{"C:\\"}
 			} else {
-				targets = []string{"."}
+				targets = []string{"/"}
 			}
 		}
 	} else {
@@ -200,6 +179,10 @@ func (m *ScanManager) RunCLI(tool string, target string, resume string) {
 
 		if resume != "" {
 			job.Options["resume"] = resume
+		}
+
+		if len(excludes) > 0 {
+			job.Options["excludes"] = strings.Join(excludes, ",")
 		}
 
 		// Run synchronously for CLI

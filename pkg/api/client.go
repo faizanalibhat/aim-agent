@@ -93,6 +93,10 @@ type AgentConfiguration struct {
 	ScanJobs          []interface{}          `json:"scan_jobs,omitempty"`
 	LatestVersion     string                 `json:"latest_version"`
 	DownloadURL       string                 `json:"download_url"`
+	ScanTargets       struct {
+		IncludeDirs []string `json:"includeDirs"`
+		ExcludeDirs []string `json:"excludeDirs"`
+	} `json:"scan_targets,omitempty"`
 }
 
 type ResultsResponse struct {

@@ -221,6 +221,12 @@ func (t *TrivyScanner) Execute(ctx context.Context, job vulnscan.ScanJob) (vulns
 		"--quiet", // To prevent pollution in stderr
 	}
 
+	if ex, ok := job.Options["excludes"]; ok && ex != "" {
+		for _, e := range strings.Split(ex, ",") {
+			args = append(args, "--skip-dirs", strings.TrimSpace(e))
+		}
+	}
+
 	args = append(args, target)
 
 	cmd := exec.CommandContext(ctx, t.binPath, args...)

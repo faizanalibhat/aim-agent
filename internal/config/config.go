@@ -14,8 +14,10 @@ type Config struct {
 	APIKey            string `yaml:"api_key"`
 	AgentID           string `yaml:"agent_id,omitempty"`
 	HeartbeatInterval int    `yaml:"heartbeat_interval"` // in seconds
-	AssetPushInterval int    `yaml:"asset_push_interval"` // in seconds
-	VulnScanInterval  int    `yaml:"vuln_scan_interval"` // in seconds
+	AssetPushInterval int      `yaml:"asset_push_interval"` // in seconds
+	VulnScanInterval  int      `yaml:"vuln_scan_interval"` // in seconds
+	IncludeDirs       []string `yaml:"include_dirs,omitempty"`
+	ExcludeDirs       []string `yaml:"exclude_dirs,omitempty"`
 }
 
 func GetDefaultConfigPath() string {

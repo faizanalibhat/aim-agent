@@ -76,6 +76,7 @@ func NewAgent(cfg *config.Config, configPath string) *Agent {
 	}
 	
 	agent.scanManager.SetScanInterval(cfg.VulnScanInterval)
+	agent.scanManager.UpdateTargets(cfg.IncludeDirs, cfg.ExcludeDirs)
 	return agent
 }
 
@@ -279,6 +280,18 @@ func (a *Agent) syncConfiguration(resp *api.ResultsResponse) bool {
 		changed = true
 	}
 
+	// Update Scan Targets if they differ
+	if resp.Configuration.ScanTargets.IncludeDirs != nil || resp.Configuration.ScanTargets.ExcludeDirs != nil {
+		includesChanged := !stringSlicesEqual(a.cfg.IncludeDirs, resp.Configuration.ScanTargets.IncludeDirs)
+		excludesChanged := !stringSlicesEqual(a.cfg.ExcludeDirs, resp.Configuration.ScanTargets.ExcludeDirs)
+		if includesChanged || excludesChanged {
+			a.cfg.IncludeDirs = resp.Configuration.ScanTargets.IncludeDirs
+			a.cfg.ExcludeDirs = resp.Configuration.ScanTargets.ExcludeDirs
+			a.scanManager.UpdateTargets(a.cfg.IncludeDirs, a.cfg.ExcludeDirs)
+			changed = true
+		}
+	}
+
 	// Trigger manual scan jobs if any
 	if len(resp.Configuration.ScanJobs) > 0 {
 		var jobs []vulnscan.ScanJob
@@ -370,4 +383,17 @@ func (a *Agent) gatherAll() (map[string]interface{}, error) {
 	}
 
 	return payload, nil
+}
+
+// stringSlicesEqual checks if two string slices have identical contents.
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
