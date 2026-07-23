@@ -3,7 +3,6 @@ package vulnscan
 import (
 	"context"
 	"log"
-	"os"
 	"runtime"
 	"strings"
 	"sync"
